@@ -4,7 +4,7 @@ Provenance Guard is a Flask backend and demo dashboard for AI attribution safety
 
 The app runs locally at `http://127.0.0.1:5010/` and includes a browser dashboard plus API endpoints.
 
-This version does not use Groq, OpenAI, or any external model API keys. Detection is deterministic and local, using explainable heuristic signals.
+This version supports Groq as the semantic AI-detection signal. Set `GROQ_API_KEY` locally or in GitHub Secrets to enable it. If the key is missing, the app still runs with local explainable heuristic signals as a fallback.
 
 ## Run
 
@@ -23,6 +23,33 @@ python gradio_app.py
 ```
 
 Gradio prints a temporary public `https://...gradio.live` link when `share=True`.
+
+## Groq Setup And GitHub Secrets
+
+The app reads Groq credentials from environment variables. Never commit the real key.
+
+Local setup:
+
+```bash
+cp .env.example .env
+# edit .env and set GROQ_API_KEY
+export GROQ_API_KEY="your_real_key_here"
+export GROQ_MODEL="llama-3.3-70b-versatile"
+```
+
+GitHub Secret setup:
+
+```bash
+gh secret set GROQ_API_KEY --repo SharadhaK30/ai201-project4-provenance-guard
+```
+
+Paste the key when GitHub CLI prompts for it. Optional model override:
+
+```bash
+gh secret set GROQ_MODEL --body "llama-3.3-70b-versatile" --repo SharadhaK30/ai201-project4-provenance-guard
+```
+
+The key is not stored in the repository. It is only read at runtime from `GROQ_API_KEY`.
 
 ## Architecture Overview
 
@@ -89,10 +116,11 @@ reviewer sees /review-queue, /appeals, /audit, or /log
 
 ## Detection Signals
 
-This version uses six local, explainable signals. That is also the ensemble detection stretch feature.
+This version uses Groq plus six local, explainable signals. If `GROQ_API_KEY` is missing or Groq fails, the Groq signal is marked unavailable and the local ensemble still runs.
 
 | Signal | What it measures | Why it helps | What it misses |
 | --- | --- | --- | --- |
+| Groq semantic AI probability | LLM judgment of whether the text reads AI-generated | Captures holistic semantic/style patterns beyond simple rules | Requires `GROQ_API_KEY`; polished human writing can still look AI-like |
 | Lexical diversity | Unique-word ratio | Repetitive vocabulary can indicate generated or templated prose | Formal human writing can repeat domain terms |
 | Sentence uniformity | Sentence length variance | AI prose often has a steady rhythm | Essays and professional writing can also be even |
 | AI phrase patterns | Phrases like "it is important to note" and "in conclusion" | Common model outputs often overuse these transitions | Humans can intentionally write this way |
@@ -298,7 +326,7 @@ This is not a real-world AI detector. It is a production safety-layer exercise s
 
 The spec helped most by forcing the transparency labels and uncertainty behavior to be designed before implementation. That made the code easier to write because classification, confidence, and user-facing messaging had clear contracts.
 
-The implementation diverged from the recommended Groq-plus-stylometrics pairing. I used six deterministic local signals instead, so the project can run in a live demo without API keys or network access. To keep the spirit of the spec, each signal captures a distinct property and the README documents each signal's blind spots.
+The implementation expanded beyond the recommended Groq-plus-stylometrics pairing. It now uses Groq when `GROQ_API_KEY` is available, plus six deterministic local signals so the project can still run in a live demo without network access. Each signal captures a distinct property and the README documents each signal's blind spots.
 
 ## AI Usage
 

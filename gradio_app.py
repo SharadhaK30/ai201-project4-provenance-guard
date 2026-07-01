@@ -244,8 +244,8 @@ with gr.Blocks(title="Provenance Guard") as demo:
     gr.Markdown(
         """
         # Provenance Guard
-        AI attribution safety dashboard for creative platforms. This demo uses local, deterministic signals only.
-        **No Groq or OpenAI API keys are used in this version.**
+        AI attribution safety dashboard for creative platforms.
+        Uses Groq when `GROQ_API_KEY` is set, plus local explainable signals as a fallback.
         """
     )
 

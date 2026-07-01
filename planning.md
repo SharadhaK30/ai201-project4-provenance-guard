@@ -4,7 +4,7 @@
 
 ### Architecture Narrative
 
-Provenance Guard is a safety layer for creative platforms. A submission enters through either `POST /classify` or the sample-compatible `POST /submit`. The API validates the request, runs six independent local detection signals, combines them into an AI-likelihood score, computes confidence separately from likelihood, and maps the result to one of three outcomes: likely AI-generated, likely human-written, or uncertain.
+Provenance Guard is a safety layer for creative platforms. A submission enters through either `POST /classify` or the sample-compatible `POST /submit`. The API validates the request, runs a Groq semantic signal when `GROQ_API_KEY` is available plus six independent local detection signals, combines them into an AI-likelihood score, computes confidence separately from likelihood, and maps the result to one of three outcomes: likely AI-generated, likely human-written, or uncertain.
 
 The system treats uncertainty as a first-class result. Short submissions and mixed signals are routed to human review instead of being forced into a binary label. Every classification decision is written to an append-only JSONL audit log with a content hash, creator ID, signal summary, confidence, and transparency label.
 
@@ -23,7 +23,7 @@ POST /classify or POST /submit
 Validate content, creator, and size limits
        |
        v
-Six local detection signals
+Groq semantic signal + six local signals
        |
        v
 AI-likelihood scorer
@@ -63,6 +63,12 @@ Reviewer inspects /review-queue, /appeals, /audit, or /log
 ```
 
 ## Detection Signals
+
+### 0. Groq Semantic AI Probability
+
+Uses `GROQ_API_KEY` and `GROQ_MODEL` from the runtime environment. The default model is `llama-3.3-70b-versatile`. The model returns a JSON `ai_probability` from 0.0 to 1.0 with one-sentence reasoning.
+
+Blind spot: polished human writing can look AI-like, and the signal requires an external API key. If the key is missing or the API fails, this signal receives weight 0 and the local signals continue.
 
 ### 1. Lexical Diversity
 
@@ -151,9 +157,9 @@ No automatic reclassification happens during appeal. A human reviewer should com
 
 ## Differences From The Reference Sample
 
-The reference sample uses a Groq LLM signal and one stylometric signal. This version is intentionally local-first and deterministic so it can run without an API key during a live demo. It also expands the safety layer beyond attribution by adding:
+The reference sample uses a Groq LLM signal and one stylometric signal. This version uses Groq when `GROQ_API_KEY` is present and also remains local-first enough to run without an API key during a live demo. It expands the safety layer beyond attribution by adding:
 
-- six explainable signals instead of two
+- Groq plus six explainable local signals instead of two total signals
 - a dashboard UI at `/`
 - home repair refusal guardrail
 - review queue endpoint
@@ -202,7 +208,7 @@ Verification: submit an appeal and confirm `/log` records it; run 12 rapid `/sub
 
 I completed all listed stretch categories:
 
-1. **Ensemble detection:** six local text signals instead of the required two.
+1. **Ensemble detection:** Groq semantic classification plus six local text signals instead of the required two.
 2. **Provenance certificate:** `POST /certificates` stores a verified-human credential after a reviewer checks evidence such as draft history or profile history. Future decisions include the certificate context.
 3. **Analytics dashboard:** `GET /analytics` and the UI show total decisions, appeal rate, uncertain rate, average confidence, verified creators, and content-type mix.
 4. **Multi-modal support:** `POST /metadata/analyze` classifies image metadata using generator-tool, prompt-artifact, camera metadata, source-file, and edit-history signals. It does not claim to inspect image pixels.

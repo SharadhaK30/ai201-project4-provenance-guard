@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import math
+import json
+import os
 import re
 from dataclasses import dataclass, asdict
 from statistics import mean, pstdev
 from typing import Any
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 
 AI_PHRASES = {
@@ -32,6 +41,8 @@ HUMAN_MARKERS = {
     "typo",
     "lol",
 }
+
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 
 @dataclass(frozen=True)
@@ -76,6 +87,66 @@ def _sentences(text: str) -> list[str]:
 
 def _sigmoid(value: float) -> float:
     return 1 / (1 + math.exp(-value))
+
+
+def _parse_groq_json(raw: str) -> dict[str, Any]:
+    cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    return json.loads(cleaned)
+
+
+def groq_semantic_signal(text: str) -> Signal:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return Signal(
+            "groq_semantic_ai_probability",
+            0.5,
+            0.0,
+            "Groq semantic signal disabled because GROQ_API_KEY is not set.",
+        )
+
+    try:
+        from groq import Groq
+
+        client = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You classify whether submitted creative text appears AI-generated. "
+                        "Return only JSON with keys ai_probability and reasoning. "
+                        "ai_probability must be a number from 0.0 to 1.0."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Assess this text for AI-generation likelihood. Avoid certainty when evidence is weak.\n\n"
+                        f"Text:\n{text}"
+                    ),
+                },
+            ],
+            temperature=0,
+            max_completion_tokens=180,
+        )
+        raw = response.choices[0].message.content or "{}"
+        parsed = _parse_groq_json(raw)
+        score = _clamp(float(parsed.get("ai_probability", 0.5)))
+        reasoning = str(parsed.get("reasoning") or "Groq returned an AI-likelihood probability.")
+        return Signal(
+            "groq_semantic_ai_probability",
+            round(score, 3),
+            0.30,
+            f"Groq {GROQ_MODEL}: {reasoning}",
+        )
+    except Exception as exc:
+        return Signal(
+            "groq_semantic_ai_probability",
+            0.5,
+            0.0,
+            f"Groq semantic signal unavailable; local signals used instead. Error: {exc.__class__.__name__}.",
+        )
 
 
 def lexical_diversity_signal(words: list[str]) -> Signal:
@@ -185,6 +256,7 @@ def classify_content(text: str) -> ClassificationResult:
     words = _words(text)
     sentences = _sentences(text)
     signals = [
+        groq_semantic_signal(text),
         lexical_diversity_signal(words),
         sentence_uniformity_signal(sentences),
         ai_phrase_signal(text),
@@ -211,6 +283,8 @@ def classify_content(text: str) -> ClassificationResult:
     top_signals = sorted(signals, key=lambda signal: signal.score * signal.weight, reverse=True)[:3]
     rationale = [f"{signal.name}: {signal.explanation}" for signal in top_signals]
     warnings: list[str] = []
+    if next(signal for signal in signals if signal.name == "groq_semantic_ai_probability").weight == 0:
+        warnings.append("Groq semantic signal was not used; set GROQ_API_KEY to enable it.")
     if len(words) < 80:
         warnings.append("Short submissions are harder to classify reliably.")
     if classification == "uncertain":
