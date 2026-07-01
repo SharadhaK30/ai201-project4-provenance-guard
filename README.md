@@ -156,6 +156,14 @@ The system separates `ai_likelihood` from `confidence`.
 - `ai_likelihood` estimates how AI-like the content appears.
 - `confidence` estimates whether the system has enough evidence to trust that estimate.
 
+Core signal-combination formula:
+
+```text
+confidence = (llm_score * 0.65) + (stylo_score * 0.35)
+```
+
+In this project, `llm_score` is the Groq semantic AI-probability signal when `GROQ_API_KEY` is available. `stylo_score` is represented by the local stylometric and heuristic ensemble: lexical diversity, sentence uniformity, AI phrase patterns, human drafting markers, punctuation shape, and template structure.
+
 This matters because a short caption can have low AI likelihood but still be unsafe to label confidently. Short or mixed-signal inputs are pushed toward `uncertain` rather than forced into a binary decision.
 
 Label mapping:
