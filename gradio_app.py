@@ -43,12 +43,13 @@ def pretty(payload: Any) -> str:
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
-def classify_text(content: str, creator_id: str, content_id: str) -> tuple[str, str, float, float, str]:
+def classify_text(content: str, creator_id: str, content_id: str) -> tuple[str, str, str, str, float, float, str, str, str]:
     content = (content or "").strip()
     creator_id = (creator_id or "anonymous").strip()
     content_id = (content_id or new_id("content")).strip()
     if not content:
-        return "Validation error", "Content is required.", 0.0, 0.0, pretty({"error": "content_required"})
+        error = pretty({"error": "content_required"})
+        return "", "", "Validation error", "Content is required.", 0.0, 0.0, error, "", creator_id
 
     decision_id = new_id("decision")
     result = classify_content(content)
@@ -87,7 +88,17 @@ def classify_text(content: str, creator_id: str, content_id: str) -> tuple[str, 
         "audit_event_id": event["event_id"],
     }
     certificate_text = certificate["display_label"] if certificate else "No verified-human certificate"
-    return result.transparency_label, result.recommended_action, result.confidence, result.ai_likelihood, pretty(payload | {"certificate": certificate_text})
+    return (
+        decision_id,
+        content_id,
+        result.transparency_label,
+        result.recommended_action,
+        result.confidence,
+        result.ai_likelihood,
+        pretty(payload | {"certificate": certificate_text}),
+        decision_id,
+        creator_id,
+    )
 
 
 def submit_appeal(decision_id: str, creator_id: str, reason: str, evidence: str) -> str:
@@ -152,13 +163,15 @@ def issue_certificate(creator_id: str, verification_method: str, evidence_summar
     return pretty({"certificate": certificate, "audit_event": audit})
 
 
-def analyze_metadata(metadata_json: str, creator_id: str, content_id: str) -> tuple[str, str, float, float, str]:
+def analyze_metadata(metadata_json: str, creator_id: str, content_id: str) -> tuple[str, str, str, str, float, float, str, str, str]:
     try:
         metadata = json.loads(metadata_json or "{}")
     except json.JSONDecodeError as exc:
-        return "Invalid metadata JSON", str(exc), 0.0, 0.0, pretty({"error": "invalid_json", "message": str(exc)})
+        error = pretty({"error": "invalid_json", "message": str(exc)})
+        return "", "", "Invalid metadata JSON", str(exc), 0.0, 0.0, error, "", (creator_id or "anonymous").strip()
     if not isinstance(metadata, dict):
-        return "Invalid metadata JSON", "Metadata must be a JSON object.", 0.0, 0.0, pretty({"error": "metadata_must_be_object"})
+        error = pretty({"error": "metadata_must_be_object"})
+        return "", "", "Invalid metadata JSON", "Metadata must be a JSON object.", 0.0, 0.0, error, "", (creator_id or "anonymous").strip()
 
     creator_id = (creator_id or "anonymous").strip()
     content_id = (content_id or new_id("content")).strip()
@@ -191,7 +204,17 @@ def analyze_metadata(metadata_json: str, creator_id: str, content_id: str) -> tu
         "provenance_certificate": certificate,
         "audit_event_id": audit["event_id"],
     }
-    return result.transparency_label, result.recommended_action, result.confidence, result.ai_likelihood, pretty(payload)
+    return (
+        decision_id,
+        content_id,
+        result.transparency_label,
+        result.recommended_action,
+        result.confidence,
+        result.ai_likelihood,
+        pretty(payload),
+        decision_id,
+        creator_id,
+    )
 
 
 def home_repair(question: str) -> str:
@@ -265,13 +288,15 @@ with gr.Blocks(title="Provenance Guard") as demo:
         )
         classify_button = gr.Button("Classify")
         with gr.Row():
+            decision_output = gr.Textbox(label="Decision ID", interactive=False)
+            stored_content_output = gr.Textbox(label="Stored Content ID", interactive=False)
+        with gr.Row():
             label = gr.Textbox(label="Transparency Label")
             action = gr.Textbox(label="Recommended Action")
         with gr.Row():
             confidence = gr.Number(label="Confidence")
             likelihood = gr.Number(label="AI Likelihood")
         classify_output = gr.Code(label="Full Classification Response", language="json")
-        classify_button.click(classify_text, [content, creator_id, content_id], [label, action, confidence, likelihood, classify_output])
 
     with gr.Tab("Appeals"):
         appeal_decision = gr.Textbox(label="Decision ID")
@@ -300,17 +325,15 @@ with gr.Blocks(title="Provenance Guard") as demo:
         )
         metadata_button = gr.Button("Analyze Metadata")
         with gr.Row():
+            metadata_decision_output = gr.Textbox(label="Decision ID", interactive=False)
+            metadata_stored_content_output = gr.Textbox(label="Stored Content ID", interactive=False)
+        with gr.Row():
             metadata_label = gr.Textbox(label="Transparency Label")
             metadata_action = gr.Textbox(label="Recommended Action")
         with gr.Row():
             metadata_confidence = gr.Number(label="Confidence")
             metadata_likelihood = gr.Number(label="AI Likelihood")
         metadata_output = gr.Code(label="Metadata Analysis Response", language="json")
-        metadata_button.click(
-            analyze_metadata,
-            [metadata_json, metadata_creator, metadata_content],
-            [metadata_label, metadata_action, metadata_confidence, metadata_likelihood, metadata_output],
-        )
 
     with gr.Tab("Safety Guardrail"):
         repair_question = gr.Textbox(value="How do I replace a breaker in my electrical panel?", label="Home Repair Question", lines=3)
@@ -322,6 +345,37 @@ with gr.Blocks(title="Provenance Guard") as demo:
         analytics_button = gr.Button("Refresh Analytics")
         analytics_output = gr.Code(label="Analytics And Recent Audit Events", language="json")
         analytics_button.click(analytics, outputs=analytics_output)
+
+    classify_button.click(
+        classify_text,
+        [content, creator_id, content_id],
+        [
+            decision_output,
+            stored_content_output,
+            label,
+            action,
+            confidence,
+            likelihood,
+            classify_output,
+            appeal_decision,
+            appeal_creator,
+        ],
+    )
+    metadata_button.click(
+        analyze_metadata,
+        [metadata_json, metadata_creator, metadata_content],
+        [
+            metadata_decision_output,
+            metadata_stored_content_output,
+            metadata_label,
+            metadata_action,
+            metadata_confidence,
+            metadata_likelihood,
+            metadata_output,
+            appeal_decision,
+            appeal_creator,
+        ],
+    )
 
 
 if __name__ == "__main__":
