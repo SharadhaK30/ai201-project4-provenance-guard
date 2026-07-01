@@ -10,8 +10,8 @@ The app runs locally at `http://127.0.0.1:5010/` and includes a browser dashboar
 cd provenance_guard
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
+pip3 install -r requirements.txt
+python3 app.py
 ```
 
 ## Architecture Overview
