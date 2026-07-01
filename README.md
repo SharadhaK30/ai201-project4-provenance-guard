@@ -4,7 +4,7 @@ Provenance Guard is a Flask backend and demo dashboard for AI attribution safety
 
 The app runs locally at `http://127.0.0.1:5010/` and includes a browser dashboard plus API endpoints.
 
-This version supports Groq as the semantic AI-detection signal. Set `GROQ_API_KEY` locally or in GitHub Secrets to enable it. If the key is missing, the app still runs with local explainable heuristic signals as a fallback.
+This version supports Groq as the semantic AI-detection signal. Set `GROQ_API_KEY` locally to enable it. If the key is missing, the app still runs with local explainable heuristic signals as a fallback.
 
 ## Run
 
