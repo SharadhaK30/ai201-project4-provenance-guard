@@ -304,13 +304,3 @@ python3 -m py_compile app.py detector.py audit.py rate_limit.py home_repair.py t
 ```
 
 Both pass locally.
-
-## Walkthrough Video Notes
-
-For the short portfolio walkthrough, show:
-
-1. Open `http://127.0.0.1:5010/`.
-2. Click Classify and explain the label, confidence, AI likelihood, and signals.
-3. Submit an appeal and show it appears in the audit/review flow.
-4. Click Refresh Audit and explain structured logging.
-5. Use the home repair guardrail with an electrical panel question and explain refusal behavior.
