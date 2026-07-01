@@ -4,6 +4,8 @@ Provenance Guard is a Flask backend and demo dashboard for AI attribution safety
 
 The app runs locally at `http://127.0.0.1:5010/` and includes a browser dashboard plus API endpoints.
 
+This version does not use Groq, OpenAI, or any external model API keys. Detection is deterministic and local, using explainable heuristic signals.
+
 ## Run
 
 ```bash
@@ -13,6 +15,14 @@ source .venv/bin/activate
 pip3 install -r requirements.txt
 python3 app.py
 ```
+
+For a public Gradio demo link:
+
+```bash
+python gradio_app.py
+```
+
+Gradio prints a temporary public `https://...gradio.live` link when `share=True`.
 
 ## Architecture Overview
 
